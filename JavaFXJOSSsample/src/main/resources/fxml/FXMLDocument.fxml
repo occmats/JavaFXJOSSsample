@@ -58,7 +58,7 @@
                         <TreeTableView fx:id="ttv1" onMouseClicked="#handleMouseClicked" prefHeight="200.0" prefWidth="200.0" showRoot="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                           <columns>
                             <TreeTableColumn fx:id="ttc1" prefWidth="419.0" text="ファイル名" />
-                            <TreeTableColumn fx:id="ttc2" prefWidth="96.0" text="サイズ" />
+                            <TreeTableColumn fx:id="ttc2" prefWidth="96.0" text="サイズ ［Byte］" />
                               <TreeTableColumn fx:id="ttc3" prefWidth="84.0" text="変更日" />
                           </columns>
                            <contextMenu>

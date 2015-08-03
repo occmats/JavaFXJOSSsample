@@ -411,7 +411,10 @@ public class FXMLController implements Initializable {
         }
         
         public String getSize() {
-            return size.get();
+            if ("".equals(size.get())) {
+                return size.get();
+            }
+            return String.format("%1$,3d", Long.parseLong(size.get()));
         }
         public void setSize(String fSize) {
             size.set(fSize);

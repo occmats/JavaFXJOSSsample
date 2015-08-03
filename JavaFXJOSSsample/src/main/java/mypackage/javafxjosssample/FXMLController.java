@@ -8,11 +8,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.URL;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.ResourceBundle;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
@@ -42,6 +48,7 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
+import org.apache.http.HttpHeaders;
 import org.javaswift.joss.client.factory.AccountConfig;
 import org.javaswift.joss.client.factory.AccountFactory;
 import org.javaswift.joss.model.Account;
@@ -92,6 +99,23 @@ public class FXMLController implements Initializable {
     @FXML
     private void clickSignIn(ActionEvent event) {
         System.out.println("You clicked me! ");
+        
+        // 疎通確認
+        try {
+            boolean ret = ping(Inet4Address.getByName("192.168.1.254"));
+            System.out.println(ret ? "SUCCESS" : "FAILED");
+            
+            if (!ping(Inet4Address.getByName("192.168.1.254"))) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("エラー");
+                alert.setHeaderText("VPN接続エラー");
+                alert.setContentText("VPN接続をご確認ください");
+                alert.showAndWait();
+                return;
+            }
+        } catch (IOException e) {
+        } catch (InterruptedException e) {
+        }
         
         try {
             // Keystone認証
@@ -382,5 +406,12 @@ public class FXMLController implements Initializable {
         public Container getContainer() {
             return container;
         }
+    }
+    
+    //http://d.hatena.ne.jp/chiheisen/20110321/1300722238 参照
+    private static String TIMEOUT = "3000";
+    public static boolean ping(InetAddress target) throws IOException, InterruptedException {
+        String[] command = {"ping", "-n", "1", "-w", TIMEOUT, target.getHostAddress()};
+        return new ProcessBuilder(command).start().waitFor() == 0;
     }
 }

@@ -244,27 +244,51 @@ public class FXMLController implements Initializable {
             
             final FileChooser chooser = new FileChooser();
             chooser.setTitle("ダウンロードファイル");
+            chooser.setInitialDirectory(new File(System.getProperty("user.home")));
+            chooser.setInitialFileName(sobj.getName());
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
             File saveFile = chooser.showSaveDialog(rootPane.getScene().getWindow());
             
             if (saveFile != null) {
-                try {
-                    System.out.println(sobj.getName()+" downloading...");
-                    InputStream  input  = new BufferedInputStream(sobj.downloadObjectAsInputStream());
-                    OutputStream output = new BufferedOutputStream(new FileOutputStream(saveFile.getPath().toString()));
+                ProgressIndicator pi = new ProgressIndicator();
+                pi.setPrefSize(30, 30);
+                hb1.getChildren().add(pi);
+                    
+                Task task = new Task<Void>() {
+                    @Override
+                    public Void call() {
+                        try {
+                            System.out.println(sobj.getName()+" downloading...");
+                            InputStream  input  = new BufferedInputStream(sobj.downloadObjectAsInputStream());
+                            OutputStream output = new BufferedOutputStream(new FileOutputStream(saveFile.getPath().toString()));
 
-                    // ストリームのコピー（※もっとうまい方法はないかな？）
-                    int byte_;
-                    while ((byte_=input.read()) != -1) {
-                        output.write(byte_);
+                            // ストリームのコピー（※もっとうまい方法はないかな？）
+                            int byte_;
+                            while ((byte_=input.read()) != -1) {
+                                output.write(byte_);
+                            }
+
+                            output.flush();
+                            output.close();
+                        } catch (FileNotFoundException ex) {
+                            ex.printStackTrace();
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+
+                        return null;
                     }
-
-                    output.flush();
-                    output.close();
-                } catch (FileNotFoundException ex) {
-                    ex.printStackTrace();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                };
+                task.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
+                    @Override
+                    public void handle(WorkerStateEvent wse) {
+                        hb1.getChildren().clear();
+                    }
+                });
+                Executor executor = Executors.newSingleThreadExecutor();
+                executor.execute(task);
+                    
+                
             }
         }
     }

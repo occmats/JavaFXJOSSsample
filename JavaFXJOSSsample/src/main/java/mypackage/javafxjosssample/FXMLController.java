@@ -8,17 +8,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.ResourceBundle;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
@@ -36,7 +32,6 @@ import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableColumn;
-import javafx.scene.control.TreeTableRow;
 import javafx.scene.control.TreeTableView;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
@@ -48,7 +43,6 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
-import org.apache.http.HttpHeaders;
 import org.javaswift.joss.client.factory.AccountConfig;
 import org.javaswift.joss.client.factory.AccountFactory;
 import org.javaswift.joss.model.Account;
@@ -99,23 +93,6 @@ public class FXMLController implements Initializable {
     @FXML
     private void clickSignIn(ActionEvent event) {
         System.out.println("You clicked me! ");
-        
-        // 疎通確認
-        try {
-            boolean ret = ping(Inet4Address.getByName("192.168.1.254"));
-            System.out.println(ret ? "SUCCESS" : "FAILED");
-            
-            if (!ping(Inet4Address.getByName("192.168.1.254"))) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("エラー");
-                alert.setHeaderText("VPN接続エラー");
-                alert.setContentText("VPN接続をご確認ください");
-                alert.showAndWait();
-                return;
-            }
-        } catch (IOException e) {
-        } catch (InterruptedException e) {
-        }
         
         try {
             // Keystone認証
@@ -181,54 +158,51 @@ public class FXMLController implements Initializable {
             event.consume();
         });
         
-        ttv1.setRowFactory((tv) -> {
-            TreeTableRow<ContainerFile> row = new TreeTableRow<>();
-            
-            row.setOnDragDropped(event -> {
-                if (!row.isEmpty()) {
-                    Integer index = row.getIndex();
-                    Container c = row.getTreeItem().getValue().getContainer();
-                    
-                    // アップロード
-                    Dragboard db = event.getDragboard();
-                    db.getFiles().stream().findFirst().ifPresent((File file) -> {
-                        
-                        ProgressIndicator pi = new ProgressIndicator();
-                        pi.setPrefSize(30, 30);
-                        hb1.getChildren().add(pi);
-                        
-                        Task task = new Task<Void>() {
-                            @Override
-                            public Void call() {
-                                StoredObject upload = c.getObject(file.getName());
-                                upload.uploadObject(new File(file.toString()));
-                                
-                                return null;
-                            }
-                        };
-                        task.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
-                            @Override
-                            public void handle(WorkerStateEvent wse) {
-                                hb1.getChildren().clear();
-                                clickReload();
-                            }
-                        });
-                        Executor executor = Executors.newSingleThreadExecutor();
-                        executor.execute(task);
-                        
+        ttv1.addEventFilter(DragEvent.DRAG_DROPPED, new EventHandler<DragEvent>() {
+
+            public void handle(DragEvent event) {
+                Calendar today = Calendar.getInstance();
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM");
+                String month = sdf.format(today.getTime());
+                
+                // 今月コンテナの作成
+                Container container = account.getContainer(month);
+                if (!container.exists()) {
+                    container.create();
+                    container.makePublic();
+                }
+                
+                // アップロード
+                Dragboard db = event.getDragboard();
+                db.getFiles().stream().findFirst().ifPresent((File file) -> {
+
+                    ProgressIndicator pi = new ProgressIndicator();
+                    pi.setPrefSize(30, 30);
+                    hb1.getChildren().add(pi);
+
+                    Task task = new Task<Void>() {
+                        @Override
+                        public Void call() {
+                            StoredObject upload = container.getObject(file.getName());
+                            upload.uploadObject(new File(file.toString()));
+                            //System.out.println("Public URL: "+upload.getPublicURL());
+
+                            return null;
+                        }
+                    };
+                    task.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
+                        @Override
+                        public void handle(WorkerStateEvent wse) {
+                            hb1.getChildren().clear();
+                            clickReload();
+                        }
                     });
-                    event.setDropCompleted(true);
-                }
-            });
-            
-            row.setOnDragDetected(event -> {
-                if (!row.isEmpty()) {
-                    Integer index = row.getIndex();
-                    System.out.println("index= "+index);
-                }
-            });
-            
-            return row;
+                    Executor executor = Executors.newSingleThreadExecutor();
+                    executor.execute(task);
+
+                });
+                event.setDropCompleted(true);
+            }
         });
     }
     
@@ -299,21 +273,41 @@ public class FXMLController implements Initializable {
     private void clickReload() {
         
         System.out.println("reloading...");
-        // コンテナリストの取得
-        containers = account.list();
         
-        TreeItem<ContainerFile> parent = new TreeItem<>(new ContainerFile("", "", "", null, null));
-        ttv1.setRoot(parent);
+        ProgressIndicator pi = new ProgressIndicator();
+        pi.setPrefSize(30, 30);
+        hb1.getChildren().add(pi);
         
-        containers.stream().forEach((container) -> {
-            // コンテナの作成
-            TreeItem<ContainerFile> root = new TreeItem<>(new ContainerFile(container.getName(), "", "", null, container));
-            container.list().stream().forEach((object) -> {
-                root.getChildren().add(new TreeItem<>(new ContainerFile(object.getName(), Long.toString(object.getContentLength()), object.getLastModified(), object, container)));
-            });
-            parent.getChildren().add(root);
-            root.setExpanded(true);
+        Task task = new Task<Void>() {
+            @Override
+            public Void call() {
+                // コンテナリストの取得
+                containers = account.list();
+
+                TreeItem<ContainerFile> parent = new TreeItem<>(new ContainerFile("", "", "", null, null));
+                ttv1.setRoot(parent);
+
+                containers.stream().forEach((container) -> {
+                    // コンテナの作成
+                    TreeItem<ContainerFile> root = new TreeItem<>(new ContainerFile(container.getName(), "", "", null, container));
+                    container.list().stream().forEach((object) -> {
+                        root.getChildren().add(new TreeItem<>(new ContainerFile(object.getName(), Long.toString(object.getContentLength()), object.getLastModified(), object, container)));
+                        System.out.println(object.getName());
+                    });
+                    parent.getChildren().add(root);
+                    root.setExpanded(true);
+                });
+                return null;
+            }
+        };
+        task.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
+            @Override
+            public void handle(WorkerStateEvent wse) {
+                hb1.getChildren().clear();
+            }
         });
+        Executor executor = Executors.newSingleThreadExecutor();
+        executor.execute(task);
     }
     
     @FXML
@@ -321,16 +315,23 @@ public class FXMLController implements Initializable {
         
         Object obj = ttv1.getSelectionModel().getSelectedItem();
         TreeItem<ContainerFile> item = (TreeItem<ContainerFile>)obj;
-        StoredObject sobj = item.getValue().getStoredObject();
-        //System.out.println(sobj.getName());
         
-        Container container = item.getValue().getContainer();
-        if (container != null) {
-            System.out.println("delete clicked! : "+sobj.getName());
-            sobj.delete();
-            
-            clickReload();
+        if (item.getValue().getStoredObject() != null) {
+            // ファイル削除
+            StoredObject sobj = item.getValue().getStoredObject();
+            Container container = item.getValue().getContainer();
+            if (container != null) {
+                System.out.println("delete clicked! : "+sobj.getName());
+                sobj.delete();
+            }
+        } else {
+            // コンテナ削除
+            Container container = item.getValue().getContainer();
+            if (container != null) {
+                container.delete();
+            }
         }
+        clickReload();
     }
     
     @FXML
@@ -406,12 +407,5 @@ public class FXMLController implements Initializable {
         public Container getContainer() {
             return container;
         }
-    }
-    
-    //http://d.hatena.ne.jp/chiheisen/20110321/1300722238 参照
-    private static String TIMEOUT = "3000";
-    public static boolean ping(InetAddress target) throws IOException, InterruptedException {
-        String[] command = {"ping", "-n", "1", "-w", TIMEOUT, target.getHostAddress()};
-        return new ProcessBuilder(command).start().waitFor() == 0;
     }
 }

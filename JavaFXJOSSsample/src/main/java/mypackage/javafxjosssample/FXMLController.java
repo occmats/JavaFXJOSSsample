@@ -100,20 +100,41 @@ public class FXMLController implements Initializable {
             config.setPassword(tfPassword.getText());
             String endPoint = String.join("", "https://", tfUrl.getText(), "/v2.0/tokens");
             config.setAuthUrl(endPoint);
-            account = new AccountFactory(config).createAccount();
             
-            // コンテナリストの取得
-            containers = account.list();
-            
-            getFiles();
-            SingleSelectionModel<Tab> selectionModel = tp1.getSelectionModel();
-            selectionModel.select(1);
-            bReload.setDisable(false);
+            ProgressIndicator pi = new ProgressIndicator();
+            pi.setPrefSize(30, 30);
+            hb1.getChildren().add(pi);
+            Task task = new Task<Void>() {
+                @Override
+                public Void call() {
+                    account = new AccountFactory(config).createAccount();
+                    
+                    // コンテナリストの取得
+                    containers = account.list();
 
-            bSignIn.setDisable(true);
-            tfAccount.setDisable(true);
-            tfPassword.setDisable(true);
+                    getFiles();
+                    SingleSelectionModel<Tab> selectionModel = tp1.getSelectionModel();
+                    selectionModel.select(1);
+                    bReload.setDisable(false);
+
+                    bSignIn.setDisable(true);
+                    tfAccount.setDisable(true);
+                    tfPassword.setDisable(true);
+                    
+                    return null;
+                }
+            };
+            task.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
+                @Override
+                public void handle(WorkerStateEvent wse) {
+                    hb1.getChildren().clear();
+                }
+            });
+            Executor executor = Executors.newSingleThreadExecutor();
+            executor.execute(task);
         } catch (Exception e) {
+            hb1.getChildren().clear();
+            
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("警告");
             alert.setHeaderText("ユーザ認証に失敗しました");

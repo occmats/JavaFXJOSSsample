@@ -136,21 +136,6 @@ public class FXMLController implements Initializable {
             event.consume();
         });
         
-//        ttv1.addEventHandler(DragEvent.DRAG_DROPPED, (DragEvent event) -> {
-//            Dragboard db = event.getDragboard();
-//            db.getFiles().stream().findFirst().ifPresent((File file) -> {
-//                System.out.println(file.toString());
-//                // アップロードファイル
-//                Container c = containers.iterator().next();
-//                StoredObject upload = c.getObject(file.getName());
-//                upload.uploadObject(new File(file.toString()));
-//                System.out.println(upload.getPublicURL());
-//                
-//                clickReload();
-//            });
-//            event.setDropCompleted(true);
-//        });
-        
         ttv1.setRowFactory((tv) -> {
             TreeTableRow<ContainerFile> row = new TreeTableRow<>();
             
@@ -162,7 +147,6 @@ public class FXMLController implements Initializable {
                     // アップロード
                     Dragboard db = event.getDragboard();
                     db.getFiles().stream().findFirst().ifPresent((File file) -> {
-                        System.out.println("start uploading...");
                         
                         ProgressIndicator pi = new ProgressIndicator();
                         pi.setPrefSize(30, 30);
@@ -174,16 +158,12 @@ public class FXMLController implements Initializable {
                                 StoredObject upload = c.getObject(file.getName());
                                 upload.uploadObject(new File(file.toString()));
                                 
-                                System.out.println("Now I'm in task.");
-                                //System.out.println(upload.getPublicURL());
-                                
                                 return null;
                             }
                         };
                         task.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
                             @Override
                             public void handle(WorkerStateEvent wse) {
-                                System.out.println("end uploading!");
                                 hb1.getChildren().clear();
                                 clickReload();
                             }
